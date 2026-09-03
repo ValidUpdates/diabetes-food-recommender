@@ -1,0 +1,48 @@
+{
+  "cart": {
+    "accuracy": 0.92,
+    "precision": 0.8784,
+    "recall": 0.9559,
+    "f1_score": 0.9155,
+    "confusion_matrix": [
+      [
+        73,
+        9
+      ],
+      [
+        3,
+        65
+      ]
+    ],
+    "ccp_alpha": 0.003452,
+    "tree_depth": 3,
+    "leaf_count": 8
+  },
+  "random_forest": {
+    "accuracy": 0.9,
+    "precision": 0.8272,
+    "recall": 0.9853,
+    "f1_score": 0.8993,
+    "confusion_matrix": [
+      [
+        68,
+        14
+      ],
+      [
+        1,
+        67
+      ]
+    ]
+  },
+  "feature_importance": {
+    "glycaemic_index": 0.5202,
+    "protein_g": 0.1605,
+    "carbohydrate_g": 0.1397,
+    "fibre_g": 0.0515,
+    "fat_g": 0.0489,
+    "calories_kcal": 0.0457,
+    "p_bmi": 0.015,
+    "p_glucose": 0.0099,
+    "p_age": 0.0086
+  }
+}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Hybrid Diabetes Food Recommender System{% endblock %}
+{% block content %}
+<div class="shell">
+  <div class="hero">
+    <h1>A two-stage decision support system for diabetes screening and Nigerian dietary guidance.</h1>
+    <p class="lede">This system pairs a CART / random forest diabetes detection stage with a conditionally-invoked food recommendation stage, ranking suitable Nigerian foods by glycaemic index, fibre, and protein content for patients who screen positive.</p>
+    <p class="lede-sub">The three interfaces below are components of Layer 1, the Application Layer. Layers 2 through 5 — preprocessing, detection, recommendation, and data — operate behind them and are not accessed directly.</p>
+
+    <div class="role-grid">
+      <a href="/patient" class="role-card">
+        <div class="role-icon">1</div>
+        <div>
+          <div class="role-tag">PATIENT INTERFACE</div>
+          <h3>Screen a patient</h3>
+        </div>
+        <p>Submit clinical parameters, run the detection stage, and receive ranked food recommendations when applicable.</p>
+        <div class="role-cta">Open
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7H11M11 7L7.5 3.5M11 7L7.5 10.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </a>
+      <a href="/healthcare-worker" class="role-card">
+        <div class="role-icon">2</div>
+        <div>
+          <div class="role-tag">HEALTHCARE WORKER UI</div>
+          <h3>Healthcare worker</h3>
+        </div>
+        <p>Review patient logs, override a detection outcome, and manage the Nigerian food nutrition database.</p>
+        <div class="role-cta">Open
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7H11M11 7L7.5 3.5M11 7L7.5 10.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </a>
+      <a href="/admin" class="role-card">
+        <div class="role-icon">3</div>
+        <div>
+          <div class="role-tag">ADMIN PANEL</div>
+          <h3>Model management</h3>
+        </div>
+        <p>Compare CART and random forest performance, swap the active classifier at either stage, and trigger retraining.</p>
+        <div class="role-cta">Open
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7H11M11 7L7.5 3.5M11 7L7.5 10.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

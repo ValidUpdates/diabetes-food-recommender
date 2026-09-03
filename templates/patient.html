@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Patient Screening — HDFRS{% endblock %}
+{% block content %}
+<div class="shell">
+  <div class="page-header">
+    <div class="kicker">STAGE 1 — DETECTION → STAGE 2 — RECOMMENDATION</div>
+    <h1>Patient screening</h1>
+    <p>Enter the patient's clinical parameters below. The detection classifier runs first; a positive outcome automatically triggers Nigerian food recommendations ranked for this patient's profile.</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Clinical parameters</div>
+    <form id="patientForm">
+      <div class="field-grid">
+        <div class="field">
+          <label for="pregnancies">Number of pregnancies</label>
+          <input type="number" id="pregnancies" min="0" max="20" value="2" required>
+        </div>
+        <div class="field">
+          <label for="glucose">Plasma glucose concentration (mg/dL)</label>
+          <input type="number" id="glucose" min="0" max="300" value="145" required>
+          <span class="hint">2-hour oral glucose tolerance test</span>
+        </div>
+        <div class="field">
+          <label for="blood_pressure">Diastolic blood pressure (mm Hg)</label>
+          <input type="number" id="blood_pressure" min="0" max="200" value="78" required>
+        </div>
+        <div class="field">
+          <label for="skin_thickness">Triceps skin fold thickness (mm)</label>
+          <input type="number" id="skin_thickness" min="0" max="100" value="28" required>
+        </div>
+        <div class="field">
+          <label for="insulin">2-hour serum insulin (mu U/mL)</label>
+          <input type="number" id="insulin" min="0" max="900" value="95" required>
+        </div>
+        <div class="field">
+          <label for="bmi">Body mass index (kg/m²)</label>
+          <input type="number" step="0.1" id="bmi" min="0" max="80" value="31.5" required>
+        </div>
+        <div class="field">
+          <label for="diabetes_pedigree">Diabetes pedigree function</label>
+          <input type="number" step="0.001" id="diabetes_pedigree" min="0" max="3" value="0.45" required>
+          <span class="hint">Genetic predisposition score</span>
+        </div>
+        <div class="field">
+          <label for="age">Age (years)</label>
+          <input type="number" id="age" min="1" max="120" value="44" required>
+        </div>
+      </div>
+      <div style="margin-top: 20px; display: flex; gap: 10px; align-items: center;">
+        <button type="submit" class="btn-primary" id="submitBtn">Run detection</button>
+        <span id="formError" style="color: var(--clay); font-size: 0.82rem;"></span>
+      </div>
+    </form>
+  </div>
+
+  <div id="resultsArea"></div>
+</div>
+
+<script>
+document.getElementById('patientForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  const errEl = document.getElementById('formError');
+  const resultsArea = document.getElementById('resultsArea');
+  errEl.textContent = '';
+
+  const fields = ['pregnancies','glucose','blood_pressure','skin_thickness','insulin','bmi','diabetes_pedigree','age'];
+  const payload = {};
+  fields.forEach(f => payload[f] = document.getElementById(f).value);
+
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+  resultsArea.innerHTML = '<div class="loading-state"><div class="spinner"></div>Running detection stage…</div>';
+
+  try {
+    const res = await fetch('/api/detect', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      errEl.textContent = (data.details || [data.error]).join('; ');
+      resultsArea.innerHTML = '';
+      return;
+    }
+
+    renderResults(data);
+  } catch (err) {
+    errEl.textContent = 'Request failed: ' + err.message;
+    resultsArea.innerHTML = '';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run detection';
+  }
+});
+
+function renderResults(data) {
+  const resultsArea = document.getElementById('resultsArea');
+  const det = data.detection;
+  const isPositive = det.outcome === 'positive';
+
+  let html = `
+    <div class="result-banner ${isPositive ? 'positive' : 'negative'}">
+      <div>
+        <div class="outcome-label">${isPositive ? 'Diabetes detection: Positive' : 'Diabetes detection: Negative'}</div>
+        <div class="prob">P(positive) = ${det.probability.toFixed(4)} · classifier: ${det.algorithm_used === 'cart' ? 'CART decision tree' : 'Random forest'} · log ID: ${data.log_id}</div>
+      </div>
+    </div>`;
+
+  if (isPositive && data.recommendations) {
+    html += `<div class="panel">
+      <div class="panel-title">
+        <span>Recommended foods (top ${data.recommendations.length})</span>
+        <span style="font-size: 0.75rem; color: var(--ink-soft); font-weight: 400;">Ranked by composite score · classifier: ${data.recommendation_algorithm_used === 'cart' ? 'CART' : 'Random forest'}</span>
+      </div>
+      <div class="food-grid">`;
+    data.recommendations.forEach((f, i) => {
+      html += `
+        <div class="food-card">
+          <div class="rank">#${i+1}</div>
+          <div class="food-name">${f.name}</div>
+          <div class="food-cat">${f.category}</div>
+          <div class="nutri-row">
+            <span>GI <b>${f.glycaemic_index}</b></span>
+            <span>Fibre <b>${f.fibre_g}g</b></span>
+            <span>Protein <b>${f.protein_g}g</b></span>
+            <span>${f.calories_kcal} kcal</span>
+          </div>
+          <div class="explanation">${f.explanation}</div>
+        </div>`;
+    });
+    html += `</div></div>`;
+  } else if (!isPositive) {
+    html += `<div class="panel">
+      <p style="color: var(--ink-soft); margin: 0;">The recommendation stage is not invoked for a negative detection outcome, per the conditional gate between Layer 3 and Layer 4. No dietary changes are indicated by this screening result alone.</p>
+    </div>`;
+  }
+
+  resultsArea.innerHTML = html;
+  resultsArea.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+</script>
+{% endblock %}

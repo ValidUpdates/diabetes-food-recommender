@@ -1,0 +1,47 @@
+{
+  "cart": {
+    "accuracy": 0.8528,
+    "precision": 0.8219,
+    "recall": 0.7407,
+    "f1_score": 0.7792,
+    "confusion_matrix": [
+      [
+        137,
+        13
+      ],
+      [
+        21,
+        60
+      ]
+    ],
+    "ccp_alpha": 0.003657,
+    "tree_depth": 5,
+    "leaf_count": 12
+  },
+  "random_forest": {
+    "accuracy": 0.8745,
+    "precision": 0.8421,
+    "recall": 0.7901,
+    "f1_score": 0.8153,
+    "confusion_matrix": [
+      [
+        138,
+        12
+      ],
+      [
+        17,
+        64
+      ]
+    ]
+  },
+  "feature_importance": {
+    "insulin": 0.4068,
+    "glucose": 0.1963,
+    "skin_thickness": 0.1503,
+    "bmi": 0.064,
+    "age": 0.0622,
+    "pregnancies": 0.0477,
+    "diabetes_pedigree": 0.0396,
+    "blood_pressure": 0.033
+  }
+}

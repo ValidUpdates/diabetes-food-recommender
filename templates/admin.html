@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Admin — HDFRS{% endblock %}
+{% block content %}
+<div class="shell shell-wide">
+  <div class="page-header">
+    <div class="kicker">SYSTEM ADMINISTRATION</div>
+    <h1>Model management panel</h1>
+    <p>Compare CART and random forest performance at each stage, swap the active classifier independently, and trigger retraining.</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">System status</div>
+    <div class="stat-grid" id="statusStats">
+      <div class="loading-state"><div class="spinner"></div>Loading…</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Detection stage (Layer 3) — Pima clinical classifier</div>
+    <div style="margin-bottom: 14px;">
+      <span style="font-size:0.8rem; color: var(--ink-soft); margin-right: 10px;">Active classifier:</span>
+      <div class="algo-toggle" id="detectionToggle"></div>
+    </div>
+    <div id="detectionMetrics"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Recommendation stage (Layer 4) — Food suitability classifier</div>
+    <div style="margin-bottom: 14px;">
+      <span style="font-size:0.8rem; color: var(--ink-soft); margin-right: 10px;">Active classifier:</span>
+      <div class="algo-toggle" id="recommendationToggle"></div>
+    </div>
+    <div id="recommendationMetrics"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">
+      <span>Model retraining</span>
+    </div>
+    <p style="font-size: 0.85rem; color: var(--ink-soft); margin-top:0;">Retrains CART and random forest at both stages from the current Pima dataset, food database, and interaction training set. Existing serialised models are replaced.</p>
+    <button class="btn-primary" id="retrainBtn" onclick="triggerRetrain()">Trigger retraining</button>
+    <span id="retrainMsg" style="margin-left: 12px; font-size: 0.82rem;"></span>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">System architecture (5 layers)</div>
+    <div class="layer-stack">
+      <div class="layer-block"><div class="layer-name">Layer 1 — Application Layer</div><div class="layer-desc">Patient Web Interface · Flask HTTP Router · Healthcare Worker UI · Admin Model Management Panel</div></div>
+      <div class="layer-block"><div class="layer-name">Layer 2 — Preprocessing Pipeline</div><div class="layer-desc">Two parallel branches: Input Validator → Imputer → Scaler → Encoder, one per stage</div></div>
+      <div class="layer-block"><div class="layer-name">Layer 3 — Detection Model Layer</div><div class="layer-desc">CART &amp; random forest detection classifiers, training routine, serialised model store</div></div>
+      <div class="gate-indicator">— conditional gate: activates on positive detection only —</div>
+      <div class="layer-block"><div class="layer-name">Layer 4 — Recommendation Model Layer</div><div class="layer-desc">CART &amp; random forest food-suitability classifiers, training routine, serialised model store</div></div>
+      <div class="layer-block"><div class="layer-name">Layer 5 — Data Layer</div><div class="layer-desc">Pima detection dataset · patient profile store · Nigerian food nutrition database · serialised model files</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentStatus = null;
+
+function metricBlock(m) {
+  return `<div class="stat-grid">
+    <div class="stat-block"><div class="stat-value">${(m.accuracy*100).toFixed(1)}%</div><div class="stat-label">Accuracy</div></div>
+    <div class="stat-block"><div class="stat-value">${(m.precision*100).toFixed(1)}%</div><div class="stat-label">Precision</div></div>
+    <div class="stat-block"><div class="stat-value">${(m.recall*100).toFixed(1)}%</div><div class="stat-label">Recall</div></div>
+    <div class="stat-block"><div class="stat-value">${(m.f1_score*100).toFixed(1)}%</div><div class="stat-label">F1 score</div></div>
+  </div>`;
+}
+
+function confusionTable(cm, label) {
+  return `<table style="margin-top:12px; max-width:360px;">
+    <thead><tr><th></th><th>Predicted Neg</th><th>Predicted Pos</th></tr></thead>
+    <tbody>
+      <tr><td><b>Actual Neg</b></td><td>${cm[0][0]}</td><td>${cm[0][1]}</td></tr>
+      <tr><td><b>Actual Pos</b></td><td>${cm[1][0]}</td><td>${cm[1][1]}</td></tr>
+    </tbody>
+  </table>`;
+}
+
+async function loadStatus() {
+  const res = await fetch('/api/admin/status');
+  currentStatus = await res.json();
+
+  document.getElementById('statusStats').innerHTML = `
+    <div class="stat-block"><div class="stat-value">${currentStatus.total_patients_logged}</div><div class="stat-label">Patients screened</div></div>
+    <div class="stat-block"><div class="stat-value">${currentStatus.food_database_size}</div><div class="stat-label">Food items on record</div></div>
+    <div class="stat-block"><div class="stat-value">${currentStatus.active_detection_algorithm === 'cart' ? 'CART' : 'Random forest'}</div><div class="stat-label">Active detection model</div></div>
+    <div class="stat-block"><div class="stat-value">${currentStatus.active_recommendation_algorithm === 'cart' ? 'CART' : 'Random forest'}</div><div class="stat-label">Active recommendation model</div></div>
+  `;
+
+  renderToggle('detectionToggle', 'detection', currentStatus.active_detection_algorithm);
+  renderToggle('recommendationToggle', 'recommendation', currentStatus.active_recommendation_algorithm);
+
+  const dm = currentStatus.detection_metrics;
+  document.getElementById('detectionMetrics').innerHTML = `
+    <p style="font-size:0.8rem; color: var(--ink-soft);"><b>CART</b> — depth ${dm.cart.tree_depth}, ${dm.cart.leaf_count} leaves (pruned, α=${dm.cart.ccp_alpha})</p>
+    ${metricBlock(dm.cart)}
+    ${confusionTable(dm.cart.confusion_matrix)}
+    <p style="font-size:0.8rem; color: var(--ink-soft); margin-top:20px;"><b>Random forest</b> — 100 estimators, max depth 10</p>
+    ${metricBlock(dm.random_forest)}
+    ${confusionTable(dm.random_forest.confusion_matrix)}
+    <p style="font-size:0.8rem; color: var(--ink-soft); margin-top:20px;"><b>Feature importance (random forest, Gini-based)</b></p>
+    <table><tbody>${Object.entries(dm.feature_importance).map(([k,v]) => `<tr><td>${k}</td><td>${(v*100).toFixed(1)}%</td></tr>`).join('')}</tbody></table>
+  `;
+
+  const rm = currentStatus.recommendation_metrics;
+  document.getElementById('recommendationMetrics').innerHTML = `
+    <p style="font-size:0.8rem; color: var(--ink-soft);"><b>CART</b> — depth ${rm.cart.tree_depth}, ${rm.cart.leaf_count} leaves (pruned, α=${rm.cart.ccp_alpha})</p>
+    ${metricBlock(rm.cart)}
+    ${confusionTable(rm.cart.confusion_matrix)}
+    <p style="font-size:0.8rem; color: var(--ink-soft); margin-top:20px;"><b>Random forest</b> — 100 estimators, max depth 10</p>
+    ${metricBlock(rm.random_forest)}
+    ${confusionTable(rm.random_forest.confusion_matrix)}
+  `;
+}
+
+function renderToggle(elId, stage, active) {
+  const el = document.getElementById(elId);
+  el.innerHTML = `
+    <button class="${active === 'cart' ? 'active' : ''}" onclick="setAlgorithm('${stage}', 'cart')">CART</button>
+    <button class="${active === 'random_forest' ? 'active' : ''}" onclick="setAlgorithm('${stage}', 'random_forest')">Random Forest</button>
+  `;
+}
+
+async function setAlgorithm(stage, algorithm) {
+  await fetch('/api/admin/set-algorithm', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({stage, algorithm})
+  });
+  loadStatus();
+}
+
+async function triggerRetrain() {
+  const btn = document.getElementById('retrainBtn');
+  const msg = document.getElementById('retrainMsg');
+  btn.disabled = true;
+  btn.textContent = 'Retraining…';
+  msg.textContent = '';
+
+  try {
+    const res = await fetch('/api/admin/retrain', {method: 'POST'});
+    const data = await res.json();
+    if (res.ok) {
+      msg.style.color = 'var(--teal)';
+      msg.textContent = 'Retraining complete. Metrics updated below.';
+      loadStatus();
+    } else {
+      msg.style.color = 'var(--clay)';
+      msg.textContent = 'Retraining failed — see server log.';
+    }
+  } catch (err) {
+    msg.style.color = 'var(--clay)';
+    msg.textContent = 'Request failed: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Trigger retraining';
+  }
+}
+
+loadStatus();
+</script>
+{% endblock %}

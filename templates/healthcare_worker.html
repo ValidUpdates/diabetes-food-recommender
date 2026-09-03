@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Healthcare Worker — HDFRS{% endblock %}
+{% block content %}
+<div class="shell shell-wide">
+  <div class="page-header">
+    <div class="kicker">CLINICAL REVIEW INTERFACE</div>
+    <h1>Healthcare worker dashboard</h1>
+    <p>Review patient screening logs, override a detection outcome where clinical judgement warrants it, and manage the Nigerian food nutrition database.</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">
+      <span>Patient screening log</span>
+      <button class="btn-secondary btn-sm" onclick="loadLogs()">Refresh</button>
+    </div>
+    <div id="logsArea"><div class="loading-state"><div class="spinner"></div>Loading logs…</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">
+      <span>Nigerian food nutrition database</span>
+      <button class="btn-secondary btn-sm" onclick="toggleAddFood()">+ Add food item</button>
+    </div>
+
+    <div id="addFoodForm" style="display:none; margin-bottom: 20px; padding: 16px; background: var(--sand-dim); border-radius: 3px;">
+      <div class="field-grid">
+        <div class="field"><label>Food name</label><input id="f_name" type="text" placeholder="e.g. Ugba (oil bean)"></div>
+        <div class="field"><label>Category</label><input id="f_category" type="text" placeholder="e.g. Staple, Soup, Fruit"></div>
+        <div class="field"><label>Glycaemic index</label><input id="f_gi" type="number" min="0" max="100"></div>
+        <div class="field"><label>Carbohydrate (g/100g)</label><input id="f_carbs" type="number" step="0.1"></div>
+        <div class="field"><label>Fibre (g/100g)</label><input id="f_fibre" type="number" step="0.1"></div>
+        <div class="field"><label>Protein (g/100g)</label><input id="f_protein" type="number" step="0.1"></div>
+        <div class="field"><label>Fat (g/100g)</label><input id="f_fat" type="number" step="0.1"></div>
+        <div class="field"><label>Calories (kcal/100g)</label><input id="f_kcal" type="number" step="1"></div>
+      </div>
+      <div style="margin-top: 14px; display:flex; gap:10px; align-items:center;">
+        <button class="btn-primary btn-sm" onclick="submitFood()">Add to database</button>
+        <span id="foodFormMsg" style="font-size: 0.8rem;"></span>
+      </div>
+    </div>
+
+    <div id="foodDbArea"><div class="loading-state"><div class="spinner"></div>Loading food database…</div></div>
+  </div>
+</div>
+
+<script>
+async function loadLogs() {
+  const area = document.getElementById('logsArea');
+  area.innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading logs…</div>';
+  const res = await fetch('/api/patient-logs');
+  const logs = await res.json();
+
+  if (logs.length === 0) {
+    area.innerHTML = '<div class="empty-state">No patients have been screened yet. Screenings submitted from the Patient interface will appear here.</div>';
+    return;
+  }
+
+  let html = '<table><thead><tr><th>Time</th><th>ID</th><th>Glucose</th><th>BMI</th><th>Age</th><th>Outcome</th><th>Recs</th><th>Action</th></tr></thead><tbody>';
+  logs.forEach(log => {
+    const badgeClass = log.detection_outcome === 'positive' ? 'positive' : 'negative';
+    const overrideNote = log.overridden ? ` <span style="font-size:0.68rem; color: var(--ochre);">(overridden from ${log.original_outcome})</span>` : '';
+    html += `<tr>
+      <td>${log.timestamp.replace('T', ' ')}</td>
+      <td><code style="font-size:0.75rem;">${log.id}</code></td>
+      <td>${log.input.glucose}</td>
+      <td>${log.input.bmi}</td>
+      <td>${log.input.age}</td>
+      <td><span class="badge ${badgeClass}">${log.detection_outcome}</span>${overrideNote}</td>
+      <td>${log.num_recommendations || '—'}</td>
+      <td>${log.overridden ? '—' : `<button class="btn-secondary btn-sm" onclick="promptOverride('${log.id}', '${log.detection_outcome}')">Override</button>`}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  area.innerHTML = html;
+}
+
+async function promptOverride(logId, currentOutcome) {
+  const newOutcome = currentOutcome === 'positive' ? 'negative' : 'positive';
+  const reason = prompt(`Override detection outcome for ${logId} from "${currentOutcome}" to "${newOutcome}"?\n\nEnter clinical justification:`);
+  if (reason === null || reason.trim() === '') return;
+
+  await fetch(`/api/override/${logId}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({outcome: newOutcome, reason: reason})
+  });
+  loadLogs();
+}
+
+async function loadFoodDb() {
+  const area = document.getElementById('foodDbArea');
+  const res = await fetch('/api/food-database');
+  const foods = await res.json();
+
+  let html = `<p style="font-size:0.8rem; color: var(--ink-soft); margin-top:0;">${foods.length} items on record.</p>`;
+  html += '<table><thead><tr><th>Name</th><th>Category</th><th>GI</th><th>Carbs</th><th>Fibre</th><th>Protein</th><th>Fat</th><th>kcal</th></tr></thead><tbody>';
+  foods.forEach(f => {
+    html += `<tr><td>${f.name}</td><td>${f.category}</td><td>${f.glycaemic_index}</td><td>${f.carbohydrate_g}</td><td>${f.fibre_g}</td><td>${f.protein_g}</td><td>${f.fat_g}</td><td>${f.calories_kcal}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  area.innerHTML = html;
+}
+
+function toggleAddFood() {
+  const form = document.getElementById('addFoodForm');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function submitFood() {
+  const payload = {
+    name: document.getElementById('f_name').value,
+    category: document.getElementById('f_category').value,
+    glycaemic_index: parseFloat(document.getElementById('f_gi').value),
+    carbohydrate_g: parseFloat(document.getElementById('f_carbs').value),
+    fibre_g: parseFloat(document.getElementById('f_fibre').value),
+    protein_g: parseFloat(document.getElementById('f_protein').value),
+    fat_g: parseFloat(document.getElementById('f_fat').value),
+    calories_kcal: parseFloat(document.getElementById('f_kcal').value),
+  };
+  const msgEl = document.getElementById('foodFormMsg');
+
+  if (!payload.name || !payload.category || Object.values(payload).some(v => v === '' || (typeof v === 'number' && isNaN(v)))) {
+    msgEl.style.color = 'var(--clay)';
+    msgEl.textContent = 'Please fill in all fields.';
+    return;
+  }
+
+  const res = await fetch('/api/food-database/add', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+
+  if (res.ok) {
+    msgEl.style.color = 'var(--teal)';
+    msgEl.textContent = `Added. Database now has ${data.total_foods} items.`;
+    loadFoodDb();
+    document.querySelectorAll('#addFoodForm input').forEach(i => i.value = '');
+  } else {
+    msgEl.style.color = 'var(--clay)';
+    msgEl.textContent = data.error || 'Failed to add.';
+  }
+}
+
+loadLogs();
+loadFoodDb();
+</script>
+{% endblock %}
