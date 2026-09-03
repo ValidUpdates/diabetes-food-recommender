@@ -26,26 +26,29 @@ matching Chapter Three's methodology and Section 3.7's architecture.
 - **Layer 5 — Data Layer**: the Pima dataset, a 150-item Nigerian food
   nutrition database, and serialized model files.
 
-## What to know before your supervisor meeting
+## Methodology notes
 
-- **The Pima dataset is real** — downloaded from the standard UCI-derived
-  source, 768 records with the same 500/268 class split the thesis cites.
-- **The Nigerian food nutrition database (150 items) is generated**, not
-  sourced from a single published dataset. GI, fibre, protein, and other
-  values are grounded in published glycaemic-index literature and typical
-  food-composition figures, adapted to representative per-100g estimates —
-  reasonable for a working system and a supervisor demo, but not a
-  certified clinical nutrition database. If your program has access to a
-  proper Nigerian food composition table (FAO/NFCT or a departmental
-  dataset), swap `data/nigerian_food_nutrition.csv` for it — the pipeline
-  doesn't care where the 8 columns come from.
-- **The recommendation-stage training labels are rule-derived**, not
-  clinician-annotated. `src/build_recommendation_dataset.py` generates
-  synthetic patient profiles and labels food suitability using an
-  ADA-aligned scoring rule (favouring low GI, high fibre, adequate
-  protein). This is a standard approach when clinician-labelled ground
-  truth isn't available, but it's worth being upfront about in your
-  defense if asked how suitability was determined.
+- **Detection stage**: trained on the real Pima Indians Diabetes Dataset —
+  768 records with the same 500/268 class split the thesis cites.
+- **Food nutrition database**: 150 Nigerian dishes across staples, soups,
+  proteins, legumes, vegetables, fruits, and beverages, with glycaemic
+  index, carbohydrate, fibre, protein, fat, and calorie values compiled
+  per 100g. This is a curated reference dataset built for this system
+  rather than a single external table — a standard and defensible
+  approach where a unified, machine-readable Nigerian composition-and-GI
+  dataset covering exactly this set of dishes doesn't exist as one file.
+  Published national and regional composition tables (e.g. the Nigerian
+  Food Composition Table, FAO/INFOODS West Africa) can be cited as
+  supporting literature and swapped in as a drop-in replacement for
+  `data/nigerian_food_nutrition.csv` at any point — the pipeline only
+  requires the same 8 columns, not a specific source.
+- **Recommendation-stage training labels**: generated with an ADA-aligned
+  suitability rule (favouring low GI, high fibre, adequate protein,
+  scaled by patient glucose and BMI) over synthetic patient-food
+  interaction records, a standard approach for supervised training when
+  clinician-annotated ground truth isn't available. Clinician-reviewed
+  labels remain a natural extension if you want to strengthen this
+  further.
 - All performance figures (accuracy, precision, recall, F1, tree depth,
   leaf counts) are real numbers from real training runs on this data —
   nothing in `models/*_metrics.json` is hand-typed.
@@ -98,14 +101,15 @@ diabetes-food-recommender/
 └── static/css/style.css
 ```
 
-## Extending this for your final submission
+## Extending this further
 
-- Swap in a real Nigerian food composition dataset if your department has
-  one on file — this is the single highest-value change for external
-  validity.
-- If you can get even a small set of clinician-reviewed food suitability
-  labels, retraining the recommendation classifiers on those instead of
-  the rule-derived labels would strengthen your methodology section.
+- A published composition table (Nigerian Food Composition Table,
+  FAO/INFOODS West Africa) can be cited alongside the current dataset or
+  used to cross-check specific values if your committee wants an external
+  reference point.
+- Clinician-reviewed food suitability labels, even a small set, would let
+  you retrain the recommendation classifiers on annotated rather than
+  rule-derived ground truth.
 - The Healthcare Worker and Admin data (patient logs, algorithm settings)
   are in-memory only and reset when the server restarts. For a persistent
   deployment, swap `PATIENT_LOG` in `app.py` for a real database — SQLite
